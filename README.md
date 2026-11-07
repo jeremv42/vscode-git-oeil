@@ -1,55 +1,57 @@
 # Git Œil
 
-Extension VS Code minimaliste autour de git :
+A minimal VS Code extension around git:
 
-- **Blame inline** : en fin de ligne courante, `Auteur, il y a 3 jours • message du commit`
-  (« Vous » pour vos commits et les lignes modifiées non commitées). Le survol affiche le
-  détail, avec un lien pour ouvrir le commit (`git show`). Les modifications non
-  enregistrées sont prises en compte (`git blame --contents -`).
-- **Vue « Stashs & branches »** dans l'onglet Contrôle de source :
-  - **Branches récentes** : les dernières branches sur lesquelles vous avez basculé,
-    lues dans le reflog de `HEAD` ; bouton ✓ pour y retourner.
-  - **Branches** locales (la courante en tête), avec avance/retard sur l'upstream ;
-    basculer (`git switch`), supprimer (clic droit, `-d` puis `-D` sur confirmation).
-  - **Stashs** : clic pour voir le contenu ; boutons apply / pop / drop ;
-    bouton de la barre de titre pour créer un stash (menu « … » : avec fichiers non suivis).
+- **Inline blame**: at the end of the current line, `Author, 3 days ago • commit message`
+  ("You" for your own commits and for uncommitted lines). Hovering shows the details, with
+  a link to open the commit in the editor (`git show`) and, when `origin` is on GitHub or
+  GitLab (gitlab.com or self-hosted), a link to the commit on the website. Unsaved changes
+  are taken into account (`git blame --contents -`).
+- **"Stashes & Branches" view** in the Source Control tab:
+  - **Recent branches**: the last branches you switched to, read from the `HEAD` reflog;
+    the ✓ button switches back to one.
+  - **Branches**: local branches (current one first), with ahead/behind against upstream;
+    switch (`git switch`), delete (right click, `-d` then `-D` after confirmation).
+  - **Stashes**: click to see the content; apply / pop / drop buttons; title bar button to
+    create a stash ("…" menu: include untracked files).
 
-L'extension est de type `workspace` : en Remote SSH / WSL / conteneur, elle s'installe et
-tourne côté distant, là où se trouvent les dépôts. Elle s'appuie sur l'extension intégrée
-`vscode.git` pour connaître les dépôts ouverts et se rafraîchir, et appelle `git` directement
-pour le reste.
+This is a `workspace` extension: with Remote SSH / WSL / Containers it is installed and runs
+on the remote side, where the repositories are. It relies on the built-in `vscode.git`
+extension to know which repositories are open and to refresh, and calls `git` directly for
+everything else.
 
 ## Installation
 
 ```sh
 npm install              # TypeScript 7 + types (dev)
-npm run package          # compile (out/) puis produit git-oeil-0.1.0.vsix
+npm run package          # compiles (out/) then builds git-oeil-0.1.0.vsix
 code --install-extension git-oeil-0.1.0.vsix
 ```
 
-## Développement
+In a Remote window, use "Extensions: Install from VSIX…": VS Code installs it on the remote.
 
-TypeScript (`src/`, tests dans `test/`) compilé avec TypeScript 7 dans `out/`
-(`npm run compile`, ou `npm run watch`). Aucune dépendance à l'exécution.
-VS Code 1.145 minimum, types Node 24. Tests : `npm test` (le parsing est aussi vérifié
-contre un vrai dépôt git temporaire).
+## Development
 
-## Réglages
+TypeScript (`src/`, tests in `test/`) compiled with TypeScript 7 into `out/`
+(`npm run compile`, or `npm run watch`). No runtime dependencies.
+VS Code 1.145 minimum, Node 24 types. Tests: `npm test` (parsing is also checked against a
+real temporary git repository).
+
+## Settings
 
 ```jsonc
 {
-  "gitOeil.blame.enabled": true,       // aussi : commande « Git Œil : afficher / masquer le blame inline »
-  "gitOeil.blame.delayMs": 150,        // délai après un mouvement du curseur
-  "gitOeil.recentBranches.count": 10   // 0 masque le groupe « Branches récentes »
+  "gitOeil.blame.enabled": true,       // also: "Git Œil: Toggle Inline Blame" command
+  "gitOeil.blame.delayMs": 150,        // delay after a cursor move
+  "gitOeil.recentBranches.count": 10   // 0 hides the "Recent branches" group
 }
 ```
 
-Couleur du blame : `workbench.colorCustomizations` → `"gitOeil.blameForeground"`.
+Blame color: `workbench.colorCustomizations` → `"gitOeil.blameForeground"`.
 
-## Remarques
+## Notes
 
-- Erreurs des commandes (conflit au `stash pop`, modifications locales qui empêchent de
-  changer de branche…) : notification avec le message de git, détail dans le canal de
-  sortie « Git Œil ».
-- Avec GitLens installé, désactivez son blame de ligne courante pour ne pas avoir deux
-  blames (`gitlens.currentLine.enabled: false`).
+- Command errors (conflict on `stash pop`, local changes preventing a branch switch…) are
+  shown in a notification with git's message, with details in the "Git Œil" output channel.
+- If GitLens is installed, disable its current line blame to avoid two blames
+  (`gitlens.currentLine.enabled: false`).

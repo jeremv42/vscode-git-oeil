@@ -7,12 +7,12 @@ const UNITS: [Intl.RelativeTimeFormatUnit, number][] = [
   ['minute', 60],
 ];
 
-/** « il y a 3 jours », « hier », « à l'instant »… */
-export function relativeTime(epochSeconds: number, nowMs: number = Date.now(), locale = 'fr'): string {
+/** "3 days ago", "yesterday", "just now"… */
+export function relativeTime(epochSeconds: number, nowMs: number = Date.now()): string {
   const diff = Math.round(nowMs / 1000 - epochSeconds);
   const abs = Math.abs(diff);
-  if (abs < 60) return locale.startsWith('fr') ? "à l'instant" : 'just now';
-  const fmt = new Intl.RelativeTimeFormat(locale, { numeric: 'auto' });
+  if (abs < 60) return 'just now';
+  const fmt = new Intl.RelativeTimeFormat('en', { numeric: 'auto' });
   for (const [unit, seconds] of UNITS) {
     if (abs >= seconds) return fmt.format(-Math.trunc(diff / seconds), unit);
   }

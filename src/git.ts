@@ -1,9 +1,9 @@
 import * as vscode from 'vscode';
 import { execFile } from 'node:child_process';
 
-// Extrait minimal de l'API de l'extension intégrée vscode.git (extensions/git/src/api/git.d.ts).
-// On s'en sert pour connaître les dépôts ouverts et être prévenu de leurs changements ;
-// les données elles-mêmes sont lues en appelant git directement.
+// Minimal subset of the built-in vscode.git extension API (extensions/git/src/api/git.d.ts).
+// Used to know which repositories are open and to be notified when they change;
+// the data itself is read by calling git directly.
 export interface GitRepository {
   readonly rootUri: vscode.Uri;
   readonly state: {
@@ -19,7 +19,7 @@ export interface GitAPI {
   readonly onDidCloseRepository: vscode.Event<GitRepository>;
 }
 
-/** API de vscode.git, ou undefined si l'extension est désactivée. */
+/** vscode.git API, or undefined if the extension is disabled. */
 export async function getGitAPI(): Promise<GitAPI | undefined> {
   try {
     const ext = vscode.extensions.getExtension<{ getAPI(version: 1): GitAPI }>('vscode.git');
@@ -37,7 +37,7 @@ export class GitError extends Error {
     readonly stderr: string,
     readonly code: number | string | null | undefined,
   ) {
-    super(stderr.trim() || `git ${args[0]} a échoué (code ${code})`);
+    super(stderr.trim() || `git ${args[0]} failed (code ${code})`);
   }
 }
 
@@ -48,7 +48,7 @@ export function setGitPath(path: string | undefined): void {
 }
 
 export interface GitOptions {
-  /** Envoyé sur l'entrée standard. */
+  /** Written to stdin. */
   input?: string;
   signal?: AbortSignal;
 }
@@ -63,7 +63,7 @@ export function git(cwd: string, args: string[], opts: GitOptions = {}): Promise
         encoding: 'utf8',
         maxBuffer: 256 * 1024 * 1024,
         signal: opts.signal,
-        // Pas de verrou sur l'index pour les lectures (même réglage que vscode.git).
+        // No index lock for reads (same setting as vscode.git).
         env: { ...process.env, GIT_OPTIONAL_LOCKS: '0', GIT_TERMINAL_PROMPT: '0' },
       },
       (err, stdout, stderr) => {
@@ -75,7 +75,7 @@ export function git(cwd: string, args: string[], opts: GitOptions = {}): Promise
   });
 }
 
-// Documents en lecture seule (contenu de stash, commit) : git-oeil:/<titre>.diff?<json>
+// Read-only documents (stash content, commit): git-oeil:/<title>.diff?<json>
 export const SCHEME = 'git-oeil';
 
 export class GitContentProvider implements vscode.TextDocumentContentProvider {
@@ -85,7 +85,7 @@ export class GitContentProvider implements vscode.TextDocumentContentProvider {
   }
 }
 
-/** Ouvre la sortie de `git <args>` dans un éditeur en lecture seule. */
+/** Opens the output of `git <args>` in a read-only editor. */
 export async function showGitOutput(cwd: string, title: string, args: string[]): Promise<void> {
   const uri = vscode.Uri.from({ scheme: SCHEME, path: `/${title}.diff`, query: JSON.stringify({ cwd, args }) });
   const doc = await vscode.workspace.openTextDocument(uri);

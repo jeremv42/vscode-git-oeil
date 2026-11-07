@@ -36,9 +36,9 @@ export class RepoNode extends vscode.TreeItem {
 }
 
 const GROUPS: Record<GroupKind, { label: string; icon: string; expanded: boolean }> = {
-  recent: { label: 'Branches récentes', icon: 'history', expanded: true },
+  recent: { label: 'Recent branches', icon: 'history', expanded: true },
   branches: { label: 'Branches', icon: 'git-branch', expanded: false },
-  stashes: { label: 'Stashs', icon: 'archive', expanded: true },
+  stashes: { label: 'Stashes', icon: 'archive', expanded: true },
 };
 
 export class GroupNode extends vscode.TreeItem {
@@ -79,13 +79,13 @@ export class BranchNode extends vscode.TreeItem {
     this.iconPath = new vscode.ThemeIcon(current ? 'check' : 'git-branch');
 
     const time = recent?.time ?? branch?.time ?? 0;
-    this.description = [current && 'actuelle', branch?.track, time && relativeTime(time)].filter(Boolean).join(' · ');
+    this.description = [current && 'current', branch?.track, time && relativeTime(time)].filter(Boolean).join(' · ');
 
     const tooltip = new vscode.MarkdownString();
     tooltip.appendMarkdown(`**${name}**`);
     if (branch?.upstream) tooltip.appendText(` → ${branch.upstream} ${branch.track}`);
-    if (recent) tooltip.appendText(`\n\nUtilisée ${relativeTime(recent.time)}`);
-    if (branch) tooltip.appendText(`\n\nDernier commit ${relativeTime(branch.time)} : ${branch.subject}`);
+    if (recent) tooltip.appendText(`\n\nUsed ${relativeTime(recent.time)}`);
+    if (branch) tooltip.appendText(`\n\nLast commit ${relativeTime(branch.time)}: ${branch.subject}`);
     this.tooltip = tooltip;
   }
 }
@@ -101,8 +101,8 @@ export class StashNode extends vscode.TreeItem {
     this.contextValue = 'stash';
     this.iconPath = new vscode.ThemeIcon('git-stash');
     this.description = [stash.branch, relativeTime(stash.time)].filter(Boolean).join(' · ');
-    this.tooltip = `${stash.ref}${stash.branch ? ` (sur ${stash.branch})` : ''}\n${stash.message}`;
-    this.command = { command: 'gitOeil.stashShow', title: 'Voir le contenu du stash', arguments: [this] };
+    this.tooltip = `${stash.ref}${stash.branch ? ` (on ${stash.branch})` : ''}\n${stash.message}`;
+    this.command = { command: 'gitOeil.stashShow', title: 'Show stash content', arguments: [this] };
   }
 }
 
@@ -123,7 +123,7 @@ export class RefsProvider implements vscode.TreeDataProvider<Node> {
     this.changed.fire(undefined);
   }
 
-  /** Rafraîchissement regroupé (les événements de vscode.git arrivent en rafale). */
+  /** Debounced refresh (vscode.git events come in bursts). */
   refreshSoon(): void {
     clearTimeout(this.timer);
     this.timer = setTimeout(() => this.refresh(), 300);
@@ -185,17 +185,17 @@ export class RefsProvider implements vscode.TreeDataProvider<Node> {
   private async fetch(root: string): Promise<RepoData> {
     const quiet = (p: Promise<string>, what: string) =>
       p.catch((e: Error) => {
-        this.log(`${what} (${root}) : ${e.message}`);
+        this.log(`${what} (${root}): ${e.message}`);
         return '';
       });
     const [branchesOut, stashesOut, reflogOut] = await Promise.all([
       quiet(git(root, ['for-each-ref', '--sort=-committerdate', `--format=${BRANCH_FORMAT}`, 'refs/heads']), 'branches'),
-      quiet(git(root, ['stash', 'list', `--format=${STASH_FORMAT}`]), 'stashs'),
-      // Un dépôt sans commit n'a pas de reflog : erreur attendue, pas de log.
+      quiet(git(root, ['stash', 'list', `--format=${STASH_FORMAT}`]), 'stashes'),
+      // A repository without commits has no reflog: expected error, not logged.
       git(root, ['reflog', 'show', '--date=unix', `--format=${REFLOG_FORMAT}`, '-n', '2000', 'HEAD']).catch(() => ''),
     ]);
     const branches = parseBranches(branchesOut);
-    // Branche courante en tête.
+    // Current branch first.
     branches.sort((a, b) => Number(b.current) - Number(a.current));
     const current = branches.find((b) => b.current)?.name;
     const names = new Set(branches.map((b) => b.name));

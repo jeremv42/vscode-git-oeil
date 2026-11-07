@@ -3,8 +3,8 @@ import { BlameController } from './blame';
 import { getGitAPI, git, GitContentProvider, GitError, SCHEME, setGitPath, showGitOutput, type GitAPI } from './git';
 import { BranchNode, RefsProvider, StashNode, type Node } from './refsView';
 
-// Extension « workspace » : en Remote (SSH, WSL, conteneur), elle tourne là où sont
-// les dépôts et le binaire git.
+// "workspace" extension: with Remote (SSH, WSL, containers) it runs where the
+// repositories and the git binary are.
 
 let output: vscode.OutputChannel;
 
@@ -18,7 +18,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 
   const api = await getGitAPI();
   setGitPath(api?.git.path);
-  if (!api) log("Extension vscode.git indisponible : dépôts détectés depuis les dossiers de l'espace de travail, sans rafraîchissement automatique.");
+  if (!api) log('vscode.git extension unavailable: repositories detected from workspace folders, no automatic refresh.');
 
   let fallbackRepos: string[] = [];
   const repos = (): string[] =>
@@ -28,7 +28,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   const refs = new RefsProvider(repos, log);
   const view = vscode.window.createTreeView('gitOeil.refs', { treeDataProvider: refs });
   const updateMessage = () => {
-    view.message = repos().length === 0 ? 'Aucun dépôt git ouvert.' : undefined;
+    view.message = repos().length === 0 ? 'No open git repository.' : undefined;
   };
   context.subscriptions.push(
     blame,
@@ -52,18 +52,18 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     if (node) return node.root;
     const roots = repos();
     if (roots.length <= 1) return roots[0];
-    return vscode.window.showQuickPick(roots, { placeHolder: 'Dépôt' });
+    return vscode.window.showQuickPick(roots, { placeHolder: 'Repository' });
   };
 
   const showError = (args: string[], e: unknown) => {
     const message = e instanceof GitError ? e.stderr.trim() || e.message : String(e);
-    log(`échec : ${message}`);
-    vscode.window.showErrorMessage(`git ${args[0]} : ${message}`, 'Voir le journal').then((choice) => {
+    log(`failed: ${message}`);
+    vscode.window.showErrorMessage(`git ${args[0]}: ${message}`, 'Show log').then((choice) => {
       if (choice) output.show();
     });
   };
 
-  /** Lance une commande git qui modifie le dépôt, affiche l'erreur éventuelle, rafraîchit. */
+  /** Runs a git command that changes the repository, shows any error, refreshes. */
   const run = async (root: string, args: string[], success?: string): Promise<boolean> => {
     try {
       log(`git ${args.join(' ')} (${root})`);
@@ -82,11 +82,11 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     }
   };
 
-  /** Les index stash@{n} bougent : on vérifie que l'entrée pointe toujours sur le même stash. */
+  /** stash@{n} indexes shift: check that the entry still points to the same stash. */
   const checkStash = async (node: StashNode): Promise<boolean> => {
     const sha = await git(node.root, ['rev-parse', node.stash.ref]).then((s) => s.trim(), () => '');
     if (sha === node.stash.sha) return true;
-    vscode.window.showWarningMessage('La liste des stashs a changé, elle vient d’être rafraîchie.');
+    vscode.window.showWarningMessage('The stash list has changed and was refreshed.');
     refs.refresh();
     return false;
   };
@@ -95,14 +95,14 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     const root = await pickRepo(node);
     if (!root) return;
     const message = await vscode.window.showInputBox({
-      prompt: untracked ? 'Message du stash (fichiers non suivis inclus)' : 'Message du stash',
-      placeHolder: 'Optionnel',
+      prompt: untracked ? 'Stash message (untracked files included)' : 'Stash message',
+      placeHolder: 'Optional',
     });
     if (message === undefined) return;
     const args = ['stash', 'push'];
     if (untracked) args.push('--include-untracked');
     if (message.trim()) args.push('-m', message.trim());
-    await run(root, args, 'Modifications mises de côté');
+    await run(root, args, 'Changes stashed');
   };
 
   context.subscriptions.push(
@@ -116,35 +116,35 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     }),
 
     vscode.commands.registerCommand('gitOeil.checkout', (node: BranchNode) =>
-      run(node.root, ['switch', node.name], `Sur la branche ${node.name}`),
+      run(node.root, ['switch', node.name], `Switched to ${node.name}`),
     ),
     vscode.commands.registerCommand('gitOeil.branchDelete', async (node: BranchNode) => {
       const ok = await vscode.window.showWarningMessage(
-        `Supprimer la branche « ${node.name} » ?`,
+        `Delete branch "${node.name}"?`,
         { modal: true },
-        'Supprimer',
+        'Delete',
       );
       if (!ok) return;
       const args = ['branch', '-d', node.name];
       try {
         log(`git ${args.join(' ')} (${node.root})`);
         await git(node.root, args);
-        vscode.window.setStatusBarMessage(`Branche ${node.name} supprimée`, 4000);
+        vscode.window.setStatusBarMessage(`Deleted branch ${node.name}`, 4000);
         refs.refresh();
         return;
       } catch (e) {
-        // -d refuse une branche non fusionnée : on propose -D, sinon on affiche l'erreur.
+        // -d refuses an unmerged branch: offer -D, otherwise show the error.
         if (!(e instanceof GitError && /not fully merged/.test(e.stderr))) {
           showError(args, e);
           return;
         }
       }
       const force = await vscode.window.showWarningMessage(
-        `La branche « ${node.name} » n'est pas fusionnée. Ses commits seront perdus s'ils ne sont sur aucune autre branche.`,
+        `Branch "${node.name}" is not fully merged. Its commits will be lost if they are not on another branch.`,
         { modal: true },
-        'Supprimer quand même',
+        'Delete anyway',
       );
-      if (force) await run(node.root, ['branch', '-D', node.name], `Branche ${node.name} supprimée`);
+      if (force) await run(node.root, ['branch', '-D', node.name], `Deleted branch ${node.name}`);
     }),
 
     vscode.commands.registerCommand('gitOeil.stashPush', (node?: Node) => stashPush(node, false)),
@@ -159,19 +159,19 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       ]),
     ),
     vscode.commands.registerCommand('gitOeil.stashApply', (node: StashNode) =>
-      // apply n'exige pas une référence stash@{n} : le sha évite toute ambiguïté.
-      run(node.root, ['stash', 'apply', node.stash.sha], 'Stash appliqué'),
+      // apply does not require a stash@{n} reference: the sha avoids any ambiguity.
+      run(node.root, ['stash', 'apply', node.stash.sha], 'Stash applied'),
     ),
     vscode.commands.registerCommand('gitOeil.stashPop', async (node: StashNode) => {
-      if (await checkStash(node)) await run(node.root, ['stash', 'pop', node.stash.ref], 'Stash appliqué et supprimé');
+      if (await checkStash(node)) await run(node.root, ['stash', 'pop', node.stash.ref], 'Stash applied and dropped');
     }),
     vscode.commands.registerCommand('gitOeil.stashDrop', async (node: StashNode) => {
       const ok = await vscode.window.showWarningMessage(
-        `Supprimer le stash « ${node.stash.message || node.stash.ref} » ?`,
-        { modal: true, detail: 'Son contenu ne sera plus accessible.' },
-        'Supprimer',
+        `Drop stash "${node.stash.message || node.stash.ref}"?`,
+        { modal: true, detail: 'Its content will no longer be accessible.' },
+        'Drop',
       );
-      if (ok && (await checkStash(node))) await run(node.root, ['stash', 'drop', node.stash.ref], 'Stash supprimé');
+      if (ok && (await checkStash(node))) await run(node.root, ['stash', 'drop', node.stash.ref], 'Stash dropped');
     }),
 
     vscode.commands.registerCommand('gitOeil.showCommit', ({ cwd, sha }: { cwd: string; sha: string }) =>

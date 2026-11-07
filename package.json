@@ -1,7 +1,7 @@
 {
   "name": "git-oeil",
   "displayName": "Git Œil",
-  "description": "Blame inline sur la ligne courante, et vue stashs / branches / branches récentes dans le contrôle de source.",
+  "description": "Inline blame on the current line, plus a stashes / branches / recent branches view in Source Control.",
   "version": "0.1.0",
   "publisher": "local",
   "license": "UNLICENSED",
@@ -27,26 +27,26 @@
         "gitOeil.blame.enabled": {
           "type": "boolean",
           "default": true,
-          "description": "Afficher le blame en fin de ligne courante."
+          "description": "Show the blame at the end of the current line."
         },
         "gitOeil.blame.delayMs": {
           "type": "number",
           "default": 150,
           "minimum": 0,
-          "description": "Délai (ms) après un déplacement du curseur ou une frappe avant de calculer le blame."
+          "description": "Delay (ms) after a cursor move or a keystroke before computing the blame."
         },
         "gitOeil.recentBranches.count": {
           "type": "number",
           "default": 10,
           "minimum": 0,
-          "description": "Nombre de branches récemment utilisées (lues dans le reflog) affichées. 0 pour masquer le groupe."
+          "description": "Number of recently used branches (read from the reflog) to show. 0 hides the group."
         }
       }
     },
     "colors": [
       {
         "id": "gitOeil.blameForeground",
-        "description": "Couleur du texte de blame en fin de ligne.",
+        "description": "Color of the end-of-line blame text.",
         "defaults": {
           "dark": "#ffffff55",
           "light": "#00000055",
@@ -59,23 +59,23 @@
       "scm": [
         {
           "id": "gitOeil.refs",
-          "name": "Stashs & branches",
+          "name": "Stashes & Branches",
           "icon": "$(git-branch)"
         }
       ]
     },
     "commands": [
-      { "command": "gitOeil.toggleBlame", "title": "Git Œil : afficher / masquer le blame inline" },
-      { "command": "gitOeil.refresh", "title": "Rafraîchir", "icon": "$(refresh)", "category": "Git Œil" },
-      { "command": "gitOeil.checkout", "title": "Basculer sur la branche", "icon": "$(check)", "category": "Git Œil" },
-      { "command": "gitOeil.branchDelete", "title": "Supprimer la branche…", "category": "Git Œil" },
-      { "command": "gitOeil.stashPush", "title": "Stash des modifications…", "icon": "$(git-stash)", "category": "Git Œil" },
-      { "command": "gitOeil.stashPushUntracked", "title": "Stash des modifications (avec fichiers non suivis)…", "category": "Git Œil" },
-      { "command": "gitOeil.stashShow", "title": "Voir le contenu du stash", "icon": "$(eye)", "category": "Git Œil" },
-      { "command": "gitOeil.stashApply", "title": "Appliquer le stash (apply)", "icon": "$(git-stash-apply)", "category": "Git Œil" },
-      { "command": "gitOeil.stashPop", "title": "Appliquer et supprimer le stash (pop)", "icon": "$(git-stash-pop)", "category": "Git Œil" },
-      { "command": "gitOeil.stashDrop", "title": "Supprimer le stash (drop)…", "icon": "$(trash)", "category": "Git Œil" },
-      { "command": "gitOeil.showCommit", "title": "Voir le commit", "category": "Git Œil" }
+      { "command": "gitOeil.toggleBlame", "title": "Git Œil: Toggle Inline Blame" },
+      { "command": "gitOeil.refresh", "title": "Refresh", "icon": "$(refresh)", "category": "Git Œil" },
+      { "command": "gitOeil.checkout", "title": "Switch to Branch", "icon": "$(check)", "category": "Git Œil" },
+      { "command": "gitOeil.branchDelete", "title": "Delete Branch…", "category": "Git Œil" },
+      { "command": "gitOeil.stashPush", "title": "Stash Changes…", "icon": "$(git-stash)", "category": "Git Œil" },
+      { "command": "gitOeil.stashPushUntracked", "title": "Stash Changes (Include Untracked)…", "category": "Git Œil" },
+      { "command": "gitOeil.stashShow", "title": "Show Stash Content", "icon": "$(eye)", "category": "Git Œil" },
+      { "command": "gitOeil.stashApply", "title": "Apply Stash", "icon": "$(git-stash-apply)", "category": "Git Œil" },
+      { "command": "gitOeil.stashPop", "title": "Pop Stash", "icon": "$(git-stash-pop)", "category": "Git Œil" },
+      { "command": "gitOeil.stashDrop", "title": "Drop Stash…", "icon": "$(trash)", "category": "Git Œil" },
+      { "command": "gitOeil.showCommit", "title": "Show Commit", "category": "Git Œil" }
     ],
     "menus": {
       "commandPalette": [

@@ -2,6 +2,7 @@ import * as vscode from 'vscode';
 import * as path from 'node:path';
 import { git } from './git';
 import { parseBlamePorcelain, UNCOMMITTED_SHA, type Blame, type CommitInfo } from './lib/parse';
+import { commitUrl, parseRemoteUrl, type RemoteWeb } from './lib/remote';
 import { relativeTime } from './lib/time';
 
 const MAX_SUMMARY = 80;
@@ -9,10 +10,16 @@ const MAX_SUMMARY = 80;
 interface CacheEntry {
   version: number;
   abort: AbortController;
-  blame: Promise<Blame | null>; // null : fichier hors dépôt, non suivi, binaire…
+  blame: Promise<Blame | null>; // null: file outside a repo, untracked, binary…
 }
 
-/** Blame de la ligne courante en fin de ligne, à la GitLens. */
+/** Per-directory info used to render the blame. */
+interface RepoInfo {
+  userEmail: string;
+  remote: RemoteWeb | null; // origin, when it is on GitHub or GitLab
+}
+
+/** Blame of the current line at the end of the line, GitLens style. */
 export class BlameController implements vscode.Disposable {
   private readonly decoration = vscode.window.createTextEditorDecorationType({
     after: {
@@ -23,7 +30,7 @@ export class BlameController implements vscode.Disposable {
     rangeBehavior: vscode.DecorationRangeBehavior.ClosedOpen,
   });
   private readonly cache = new Map<string, CacheEntry>();
-  private readonly userEmails = new Map<string, Promise<string>>();
+  private readonly repoInfos = new Map<string, Promise<RepoInfo>>();
   private readonly disposables: vscode.Disposable[] = [];
   private timer: NodeJS.Timeout | undefined;
   private enabled = true;
@@ -55,9 +62,10 @@ export class BlameController implements vscode.Disposable {
     this.schedule();
   }
 
-  /** À appeler quand un dépôt change (commit, checkout…) : les blames en cache sont périmés. */
+  /** Call when a repository changes (commit, checkout, remote…): cached blames are stale. */
   invalidate(): void {
     for (const key of [...this.cache.keys()]) this.forget(key);
+    this.repoInfos.clear();
     this.schedule();
   }
 
@@ -92,16 +100,15 @@ export class BlameController implements vscode.Disposable {
       return;
     }
     const version = doc.version;
-    const blame = await this.blame(doc);
-    // L'éditeur a pu changer pendant l'appel à git.
+    const dir = path.dirname(doc.uri.fsPath);
+    const [blame, info] = await Promise.all([this.blame(doc), this.repoInfo(dir)]);
+    // The editor may have changed while git was running.
     if (vscode.window.activeTextEditor !== editor || doc.version !== version) return;
     if (!blame) {
       editor.setDecorations(this.decoration, []);
       return;
     }
 
-    const dir = path.dirname(doc.uri.fsPath);
-    const userEmail = await this.userEmail(dir);
     const lines = [...new Set(editor.selections.map((s) => s.active.line))];
     const options: vscode.DecorationOptions[] = [];
     for (const line of lines) {
@@ -110,14 +117,14 @@ export class BlameController implements vscode.Disposable {
       const end = doc.lineAt(line).range.end;
       options.push({
         range: new vscode.Range(end, end),
-        renderOptions: { after: { contentText: blameText(commit, userEmail) } },
-        hoverMessage: blameHover(commit, dir, userEmail),
+        renderOptions: { after: { contentText: blameText(commit, info) } },
+        hoverMessage: blameHover(commit, dir, info),
       });
     }
     editor.setDecorations(this.decoration, options);
   }
 
-  /** Blame du contenu actuel de l'éditeur (modifications non enregistrées comprises). */
+  /** Blame of the editor's current content (unsaved changes included). */
   private blame(doc: vscode.TextDocument): Promise<Blame | null> {
     const key = doc.uri.toString();
     const cached = this.cache.get(key);
@@ -130,50 +137,54 @@ export class BlameController implements vscode.Disposable {
       input: doc.getText(),
       signal: abort.signal,
     }).then(parseBlamePorcelain, (e: Error) => {
-      if (!abort.signal.aborted) this.log(`blame ${file} : ${e.message.split('\n')[0]}`);
+      if (!abort.signal.aborted) this.log(`blame ${file}: ${e.message.split('\n')[0]}`);
       return null;
     });
     this.cache.set(key, { version: doc.version, abort, blame });
     return blame;
   }
 
-  private userEmail(dir: string): Promise<string> {
-    let email = this.userEmails.get(dir);
-    if (!email) {
-      email = git(dir, ['config', 'user.email']).then(
-        (out) => out.trim(),
-        () => '',
+  private repoInfo(dir: string): Promise<RepoInfo> {
+    let info = this.repoInfos.get(dir);
+    if (!info) {
+      const read = (args: string[]) => git(dir, args).then((out) => out.trim(), () => '');
+      info = Promise.all([read(['config', 'user.email']), read(['remote', 'get-url', 'origin'])]).then(
+        ([userEmail, origin]) => ({ userEmail, remote: origin ? parseRemoteUrl(origin) : null }),
       );
-      this.userEmails.set(dir, email);
+      this.repoInfos.set(dir, info);
     }
-    return email;
+    return info;
   }
 }
 
-function authorName(commit: CommitInfo, userEmail: string): string {
-  if (commit.sha === UNCOMMITTED_SHA) return 'Vous';
-  return userEmail && commit.authorMail === userEmail ? 'Vous' : commit.author;
+function authorName(commit: CommitInfo, info: RepoInfo): string {
+  if (commit.sha === UNCOMMITTED_SHA) return 'You';
+  return info.userEmail && commit.authorMail === info.userEmail ? 'You' : commit.author;
 }
 
-function blameText(commit: CommitInfo, userEmail: string): string {
-  if (commit.sha === UNCOMMITTED_SHA) return 'Vous • Modification non commitée';
+function blameText(commit: CommitInfo, info: RepoInfo): string {
+  if (commit.sha === UNCOMMITTED_SHA) return 'You • Uncommitted changes';
   let summary = commit.summary;
   if (summary.length > MAX_SUMMARY) summary = summary.slice(0, MAX_SUMMARY - 1) + '…';
-  return `${authorName(commit, userEmail)}, ${relativeTime(commit.authorTime)} • ${summary}`;
+  return `${authorName(commit, info)}, ${relativeTime(commit.authorTime)} • ${summary}`;
 }
 
-function blameHover(commit: CommitInfo, cwd: string, userEmail: string): vscode.MarkdownString | undefined {
+function blameHover(commit: CommitInfo, cwd: string, info: RepoInfo): vscode.MarkdownString | undefined {
   if (commit.sha === UNCOMMITTED_SHA) return undefined;
   const md = new vscode.MarkdownString();
   md.isTrusted = { enabledCommands: ['gitOeil.showCommit'] };
-  const date = new Date(commit.authorTime * 1000).toLocaleString();
+  md.supportThemeIcons = true;
+  const date = new Date(commit.authorTime * 1000).toLocaleString('en');
   const args = encodeURIComponent(JSON.stringify([{ cwd, sha: commit.sha }]));
-  md.appendMarkdown(`**${escape(authorName(commit, userEmail))}** `);
+  md.appendMarkdown(`**${escape(authorName(commit, info))}** `);
   md.appendText(`<${commit.authorMail}>`);
   md.appendMarkdown(`, ${relativeTime(commit.authorTime)} (${escape(date)})\n\n`);
   md.appendText(commit.summary);
-  md.appendMarkdown(`\n\n---\n\n[$(git-commit) ${commit.sha.slice(0, 8)}](command:gitOeil.showCommit?${args} "Voir le commit")`);
-  md.supportThemeIcons = true;
+  md.appendMarkdown(`\n\n---\n\n[$(git-commit) ${commit.sha.slice(0, 8)}](command:gitOeil.showCommit?${args} "Show commit")`);
+  if (info.remote) {
+    const url = commitUrl(info.remote, commit.sha);
+    md.appendMarkdown(` &nbsp;|&nbsp; [$(link-external) Open on ${info.remote.provider}](${url} "${url}")`);
+  }
   return md;
 }
 
