@@ -9,3 +9,4 @@ out/test/**
 tsconfig.json
 **/*.ts
 *.vsix
+.github/**

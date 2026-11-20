@@ -48,10 +48,10 @@
         "id": "gitOeil.blameForeground",
         "description": "Color of the end-of-line blame text.",
         "defaults": {
-          "dark": "#ffffff55",
-          "light": "#00000055",
-          "highContrast": "#ffffff99",
-          "highContrastLight": "#00000099"
+          "dark": "#ffffff38",
+          "light": "#00000038",
+          "highContrast": "#ffffff77",
+          "highContrastLight": "#00000077"
         }
       }
     ],
